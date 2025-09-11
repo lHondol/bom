@@ -10,38 +10,50 @@ interface RepeaterProps {
     onInputsChange?: (inputs: Input[][]) => void;
     className?: string;
     rowClassName?: string;
+    addButtonLabel?: string;
 }
 
-function Repeater({ hideInitial = false, renderInputs, onInputsChange, className, rowClassName }: PropsWithChildren<RepeaterProps>) {
-    const initializeInput = (input: Input, rowIndex: number): Input => {
+function Repeater({ hideInitial = false, renderInputs, onInputsChange, className, rowClassName, addButtonLabel }: PropsWithChildren<RepeaterProps>) {
+    const [inputs, setInputs] = useState<Input[][]>([]);
+
+    const initializeInput = (input: Input, index: number): Input => {
         if (input.renderType === 'repeater') {
             const repeaterInput = input as RepeaterInput;
-            return {
-                ...repeaterInput,
-                id: `${repeaterInput.label?.replace(' ', '').toLowerCase()}_${rowIndex}`,
-                // initialize nested repeater rows
-                value: repeaterInput.value || [repeaterInput.renderInputs.map((subInput, subIndex) => initializeInput(subInput, subIndex))],
-            };
+            if (!repeaterInput.hideInitial) {
+                return {
+                    ...repeaterInput,
+                    id: `${repeaterInput.label?.replace(' ', '').toLowerCase()}_${index}`,
+                    // initialize nested repeater rows
+                    value: repeaterInput.value || [repeaterInput.renderInputs.map((subInput) => initializeInput(subInput, index))],
+                };
+            }
         }
         return {
             ...input,
-            id: `${input.label?.replace(' ', '').toLowerCase()}_${rowIndex}`,
+            id: `${input.label?.replace(' ', '').toLowerCase()}_${index}`,
             value: input.value || '',
         };
     };
 
-    const [inputs, setInputs] = useState<Input[][]>(() => {
-        if (!hideInitial) return [renderInputs.map((input, i) => initializeInput(input, i))];
-        return [];
-    });
+    useEffect(() => {
+        if (!hideInitial) {
+            setInputs([renderInputs.map((input, i) => initializeInput(input, inputs.length))]);
+        } else {
+            setInputs([]);
+        }
+    }, [renderInputs, hideInitial]);
 
     const handleAddRow = () => {
         const newRow = renderInputs.map((input) => ({
             ...input,
-            id: `${input.label?.toLowerCase()}_${inputs.length}`,
+            id: `${input.label?.replace(' ', '').toLowerCase()}_${inputs.length}`,
             value: '',
         }));
-        setInputs((prev) => [...prev, newRow]);
+        setInputs((prev) => {
+            const updated = [...prev, newRow];
+            onInputsChange?.(updated);
+            return updated;
+        });
     };
 
     const handleInputChange = (rowIndex: number, inputIndex: number, value: string | Input[][]) => {
@@ -57,15 +69,17 @@ function Repeater({ hideInitial = false, renderInputs, onInputsChange, className
     };
 
     return (
-        <div className={cn(className)}>
+        <div className={cn("space-y-3", className)}>
             {inputs.map((row, rowIndex) => (
                 <div className={cn('w-full', rowClassName)} key={`row-${rowIndex}`}>
-                    {row.map((input, inputIndex) => renderInput(input, (val) => handleInputChange(rowIndex, inputIndex, val)))}
+                    {row.map((input, inputIndex) =>
+                        renderInput(input, (val) => handleInputChange(rowIndex, inputIndex, val), `${rowIndex}-${inputIndex}-${input.id}`)
+                    )}
                 </div>
             ))}
 
             <Button variant="contained" onClick={handleAddRow}>
-                Add Row
+                {addButtonLabel ?? 'Add Row'}
             </Button>
         </div>
     );

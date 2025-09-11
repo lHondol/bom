@@ -3,11 +3,12 @@ import { cn } from '@/lib/utils';
 import { AutocompleteInput, Input, RepeaterInput } from '@/types/input';
 import { Autocomplete, TextField } from '@mui/material';
 
-const renderInput = (input: Input, onChange: (value: string | Input[][]) => void) => {
+const renderInput = (input: Input, onChange: (value: string | Input[][]) => void, key: string) => {
     switch (input.renderType) {
         case 'autocomplete':
             return (
                 <Autocomplete
+                    key={key}
                     className={cn('w-full', input.className)}
                     options={(input as AutocompleteInput).options}
                     renderInput={(params) => <TextField {...params} label={input.label} />}
@@ -18,22 +19,25 @@ const renderInput = (input: Input, onChange: (value: string | Input[][]) => void
             );
             break;
         case 'textfield':
-            return <TextField className={cn('w-full', input.className)} label={input.label} onChange={(e) => onChange(e.target.value)} />;
+            return <TextField key={key} className={cn('w-full', input.className)} label={input.label} onChange={(e) => onChange(e.target.value)} />;
             break;
         case 'textfieldnumeric':
             return (
-                <TextField className={cn('w-full', input.className)} type={'number'} label={input.label} onChange={(e) => onChange(e.target.value)} />
+                <TextField key={key} className={cn('w-full', input.className)} type={'number'} label={input.label} onChange={(e) => onChange(e.target.value)} />
             );
             break;
         case 'repeater':
             return (
                 <Repeater
+                    key={key}
                     hideInitial={(input as RepeaterInput).hideInitial}
+                    rowClassName={cn('w-full', (input as RepeaterInput).rowClassName)}
                     className={cn('w-full', input.className)}
                     renderInputs={(input as RepeaterInput).renderInputs}
                     onInputsChange={(nestedInputs) => {
                         onChange(nestedInputs);
                     }}
+                    addButtonLabel={(input as RepeaterInput).addButtonLabel}
                 />
             );
             break;

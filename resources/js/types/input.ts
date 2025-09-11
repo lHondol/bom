@@ -20,6 +20,7 @@ interface RepeaterInput extends BaseInput {
     onChange: (rowIndex: number, inputIndex: number, value: string | Input[][]) => void;
     onInputsChange: (inputs: Input[][]) => void;
     hideInitial: boolean
+    addButtonLabel: string
 }
 
 type Input = AutocompleteInput | RepeaterInput;
