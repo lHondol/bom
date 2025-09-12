@@ -30,12 +30,14 @@ const renderInput = (input: Input, onChange: (value: string | Input[][]) => void
             return (
                 <Repeater
                     key={key}
+                    label={input.label}
+                    parentPrefix={input.id}
                     hideInitial={(input as RepeaterInput).hideInitial}
                     rowClassName={cn('w-full', (input as RepeaterInput).rowClassName)}
                     className={cn('w-full', input.className)}
                     renderInputs={(input as RepeaterInput).renderInputs}
-                    onInputsChange={(nestedInputs) => {
-                        onChange(nestedInputs);
+                    onInputsChange={(_, inputs) => {
+                        onChange(inputs);
                     }}
                     addButtonLabel={(input as RepeaterInput).addButtonLabel}
                 />

@@ -2,12 +2,21 @@ import { Repeater } from '@/components/repeater';
 import { cn } from '@/lib/utils';
 import { AutocompleteInput, Input, RepeaterInput } from '@/types/input';
 import { Paper, Typography } from '@mui/material';
-import { PropsWithChildren, useState } from 'react';
+import { PropsWithChildren, startTransition, useCallback, useEffect, useState } from 'react';
 
 interface BomRecordProps {}
 
 export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps>) {
     const [allInputs, setAllInputs] = useState<Input[]>([]);
+
+    const handleInputsChange = useCallback((label: string, inputs: Input[][]) => {
+        startTransition(() => {
+            setAllInputs((prev) => ({
+                ...prev,
+                [label]: flattenInputs(inputs.flat(1)),
+            }));
+        });
+    }, []);
 
     const [subComponentInputs, setSubComponentInputs] = useState<Input[]>([
         {
@@ -75,7 +84,7 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
             className: 'flex-1',
         } as Input,
         {
-            label: 'Sub Component',
+            label: 'Sub Components',
             renderType: 'repeater',
             type: 'static',
             className: 'w-full',
@@ -83,9 +92,6 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
             hideInitial: true,
             renderInputs: subComponentInputs,
             addButtonLabel: 'Add Sub Component',
-            onInputsChange: (inputs: Input[][]) => {
-                console.log(inputs);
-            },
         } as RepeaterInput,
     ]);
 
@@ -94,7 +100,7 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
             label: 'Supporting Material',
             renderType: 'autocomplete',
             type: 'static',
-            className: 'w-1/4',
+            className: 'w-1/3',
             options: [],
         } as AutocompleteInput,
         {
@@ -104,6 +110,16 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
             className: 'w-1/4',
         } as Input,
     ]);
+
+    const supportingMaterialRenderInputs = supportingMaterialInputs.map((input) => {
+        if (input.label === 'Supporting Material' && input.renderType === 'autocomplete') {
+            return {
+                ...input,
+                options: Object.values(allInputs).flat(1).map((i) => i.id),
+            } as AutocompleteInput;
+        }
+        return input;
+    });
 
     function flattenInputs(inputs: Input[]): Input[] {
         const result: Input[] = [];
@@ -131,16 +147,6 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
         return result;
     }
 
-    const dynamicSupportingMaterialInputs = supportingMaterialInputs.map((input) => {
-        if (input.label === 'Supporting Material' && input.renderType === 'autocomplete') {
-            return {
-                ...input,
-                options: allInputs.map((i) => i.id),
-            } as AutocompleteInput;
-        }
-        return input;
-    });
-
     return (
         <div className={cn('space-y-3 p-8')}>
             <Paper elevation={3} className={cn('p-8')}>
@@ -148,13 +154,11 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
                     Components
                 </Typography>
                 <Repeater
+                    label="Components"
                     rowClassName={cn('flex flex-wrap gap-3 space-y-3')}
                     addButtonLabel="Add Component"
                     renderInputs={componentInputs}
-                    onInputsChange={(inputs) => {
-                        console.log(flattenInputs(inputs.flat(1)))
-                        setAllInputs((prev) => [...flattenInputs(inputs.flat(1))]);
-                    }}
+                    onInputsChange={handleInputsChange}
                 />
             </Paper>
             <Paper elevation={3} className={cn('p-8')}>
@@ -162,12 +166,11 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
                     Supporting Materials
                 </Typography>
                 <Repeater
+                    label="Supporting Materials"
                     rowClassName={cn('flex gap-3 space-y-3')}
                     addButtonLabel="Add Supporting Material"
-                    renderInputs={dynamicSupportingMaterialInputs}
-                    onInputsChange={(inputs) => {
-                        setAllInputs((prev) => [...flattenInputs(inputs.flat(1))]);
-                    }}
+                    renderInputs={supportingMaterialRenderInputs}
+                    onInputsChange={handleInputsChange}
                 />
             </Paper>
         </div>
