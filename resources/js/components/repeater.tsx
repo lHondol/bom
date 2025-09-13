@@ -10,10 +10,11 @@ interface RepeaterProps {
     parentPrefix?: string;
     hideInitial?: boolean;
     renderInputs: Input[];
-    onInputsChange?: (identifier: string, inputs: Input[][]) => void;
+    onInputsChange?: (inputs: Input[][]) => void;
     className?: string;
     rowClassName?: string;
     addButtonLabel?: string;
+    value: Input[][];
 }
 
 interface RowProps {
@@ -32,7 +33,6 @@ const Row = memo(({ row, rowIndex, rowClassName, onChange }: RowProps) => {
         </div>
     );
 });
-
 Row.displayName = 'Row';
 
 function Repeater({
@@ -44,10 +44,10 @@ function Repeater({
     className,
     rowClassName,
     addButtonLabel,
+    value,
 }: PropsWithChildren<RepeaterProps>) {
-    const [inputs, setInputs] = useState<Input[][]>([]);
-
-    const identifier = label?.replace(' ', '_').toLowerCase();
+    // Local state for instant updates
+    const [localRows, setLocalRows] = useState<Input[][]>(value ?? []);
 
     const initializeInput = useCallback(
         (input: Input, index: number, prefix?: string): Input => {
@@ -59,10 +59,7 @@ function Repeater({
                 return {
                     ...repeaterInput,
                     id: currentId,
-                    // initialize nested repeater rows
-                    value: !repeaterInput.hideInitial
-                        ? [repeaterInput.renderInputs.map((subInput) => initializeInput(subInput, index, currentId))]
-                        : [],
+                    value: !repeaterInput.hideInitial ? [repeaterInput.renderInputs.map((subInput) => initializeInput(subInput, 0, currentId))] : [],
                 };
             }
             return {
@@ -71,80 +68,52 @@ function Repeater({
                 value: input.value || '',
             };
         },
-        [renderInputs],
+        [renderInputs, label],
     );
 
+    // Sync localRows with parent on first mount
     useEffect(() => {
-        setInputs((prev) => {
-            if (!hideInitial && prev.length === 0) {
-                return [renderInputs.map((input, i) => initializeInput(input, 0, parentPrefix))];
-            }
+        if (!hideInitial && (!localRows || localRows.length === 0)) {
+            const initialRow = renderInputs.map((input, i) => initializeInput(input, 0, parentPrefix));
+            setLocalRows([initialRow]);
+            onInputsChange?.([initialRow]);
+        }
+    }, []);
 
-            let hasChanged = false;
+    // Debounced parent sync
+    const debouncedSync = useDebouncedCallback((rows: Input[][]) => {
+        onInputsChange?.(rows);
+    }, 300);
 
-            const updated = prev.map((row) =>
-                row.map((input, inputIndex) => {
-                    const updatedDef = renderInputs[inputIndex];
-                    if (!updatedDef) return input;
-
-                    // Only create new object if something changed
-                    const isSame =
-                        input.label === updatedDef.label &&
-                        input.renderType === updatedDef.renderType &&
-                        (input.renderType !== 'autocomplete' ||
-                            JSON.stringify((input as any).options) === JSON.stringify((updatedDef as any).options));
-
-                    if (isSame) return input; // keep old reference
-
-                    hasChanged = true;
-                    return {
-                        ...input,
-                        ...updatedDef,
-                        value: input.value,
-                    };
-                }),
-            );
-
-            return hasChanged ? updated : prev; // only set state if something changed
-        });
-    }, [renderInputs, hideInitial, initializeInput, parentPrefix]);
-
-    const debouncedOnInputsChange = useDebouncedCallback(
-        (updatedRows: Input[][]) => {
-            onInputsChange?.(`repeater_${identifier}`, updatedRows);
-        },
-        300, // debounce 300ms (adjust as needed)
-    );
-
-    const handleAddRow = useCallback(() => {
-        const newRow = renderInputs.map((input, i) => initializeInput(input, inputs.length, parentPrefix));
-        setInputs((prev) => [...prev, newRow]);
-    }, [inputs.length, renderInputs, initializeInput, parentPrefix]);
-
+    // Input change handler
     const handleInputChange = useCallback(
-        (rowIndex: number, inputIndex: number, value: string | Input[][]) => {
-            setInputs((prev) => {
-                const newRows = [...prev];
-                newRows[rowIndex][inputIndex] = {
-                    ...newRows[rowIndex][inputIndex],
-                    value,
-                };
-                return newRows;
+        (rowIndex: number, inputIndex: number, newVal: string | Input[][]) => {
+            setLocalRows((prev) => {
+                const updated = prev.map((row, i) =>
+                    i === rowIndex ? row.map((input, j) => (j === inputIndex ? { ...input, value: newVal } : input)) : row,
+                );
+                debouncedSync(updated);
+                return updated;
             });
         },
-        [setInputs, debouncedOnInputsChange],
+        [debouncedSync],
     );
 
-    useEffect(() => {
-        debouncedOnInputsChange(inputs);
-    }, [inputs, debouncedOnInputsChange]);
+    // Add new row
+    const handleAddRow = useCallback(() => {
+        const newRow = renderInputs.map((input) => initializeInput(input, localRows.length, parentPrefix));
+        setLocalRows((prev) => {
+            const updated = [...prev, newRow];
+            onInputsChange?.(updated); // Instant sync on add
+            return updated;
+        });
+    }, [localRows, renderInputs, initializeInput, parentPrefix, onInputsChange]);
 
     return (
         <div className={cn('space-y-3', className)}>
-            {inputs.map((row, rowIndex) => (
+            {localRows.map((row, rowIndex) => (
                 <Row key={`row-${rowIndex}`} row={row} rowIndex={rowIndex} rowClassName={rowClassName} onChange={handleInputChange} />
             ))}
-
             <Button variant="contained" onClick={handleAddRow}>
                 {addButtonLabel ?? 'Add Row'}
             </Button>

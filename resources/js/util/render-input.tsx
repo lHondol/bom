@@ -5,44 +5,65 @@ import { Autocomplete, TextField } from '@mui/material';
 
 const renderInput = (input: Input, onChange: (value: string | Input[][]) => void, key: string) => {
     switch (input.renderType) {
-        case 'autocomplete':
+        case 'autocomplete': {
+            const autoCompleteInput = input as AutocompleteInput;
             return (
                 <Autocomplete
                     key={key}
-                    className={cn('w-full', input.className)}
-                    options={(input as AutocompleteInput).options}
-                    renderInput={(params) => <TextField {...params} label={input.label} />}
+                    className={cn('w-full', autoCompleteInput.className)}
+                    options={autoCompleteInput.options}
+                    renderInput={(params) => <TextField {...params} label={autoCompleteInput.label} />}
+                    value={autoCompleteInput.value}
                     onChange={(e, newValue) => {
                         onChange(newValue || '');
                     }}
                 />
             );
             break;
+        }
         case 'textfield':
-            return <TextField key={key} className={cn('w-full', input.className)} label={input.label} onChange={(e) => onChange(e.target.value)} />;
-            break;
-        case 'textfieldnumeric':
             return (
-                <TextField key={key} className={cn('w-full', input.className)} type={'number'} label={input.label} onChange={(e) => onChange(e.target.value)} />
-            );
-            break;
-        case 'repeater':
-            return (
-                <Repeater
+                <TextField
                     key={key}
-                    label={input.label}
-                    parentPrefix={input.id}
-                    hideInitial={(input as RepeaterInput).hideInitial}
-                    rowClassName={cn('w-full', (input as RepeaterInput).rowClassName)}
                     className={cn('w-full', input.className)}
-                    renderInputs={(input as RepeaterInput).renderInputs}
-                    onInputsChange={(_, inputs) => {
-                        onChange(inputs);
-                    }}
-                    addButtonLabel={(input as RepeaterInput).addButtonLabel}
+                    label={input.label}
+                    value={input.value}
+                    onChange={(e) => onChange(e.target.value)}
                 />
             );
             break;
+        case 'textfieldnumeric':
+            return (
+                <TextField
+                    key={key}
+                    className={cn('w-full', input.className)}
+                    type={'number'}
+                    label={input.label}
+                    value={input.value}
+                    onChange={(e) => onChange(e.target.value)}
+                />
+            );
+            break;
+        case 'repeater': {
+            const repeaterInput = input as RepeaterInput;
+            return (
+                <Repeater
+                    key={key}
+                    label={repeaterInput.label}
+                    parentPrefix={repeaterInput.id}
+                    hideInitial={repeaterInput.hideInitial}
+                    rowClassName={cn('w-full', repeaterInput.rowClassName)}
+                    className={cn('w-full', input.className)}
+                    renderInputs={repeaterInput.renderInputs}
+                    onInputsChange={(inputs) => {
+                        onChange(inputs);
+                    }}
+                    addButtonLabel={repeaterInput.addButtonLabel}
+                    value={input.value as Input[][]}
+                />
+            );
+            break;
+        }
     }
 };
 

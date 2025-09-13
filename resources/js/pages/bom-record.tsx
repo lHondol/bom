@@ -2,23 +2,24 @@ import { Repeater } from '@/components/repeater';
 import { cn } from '@/lib/utils';
 import { AutocompleteInput, Input, RepeaterInput } from '@/types/input';
 import { Paper, Typography } from '@mui/material';
-import { PropsWithChildren, startTransition, useCallback, useEffect, useState } from 'react';
+import { PropsWithChildren, useCallback, useRef, useState } from 'react';
 
 interface BomRecordProps {}
 
+type InputMap = Record<string, Input>;
+
 export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps>) {
-    const [allInputs, setAllInputs] = useState<Input[]>([]);
+    const [formState, setFormState] = useState<{
+        components: Input[][];
+        supportingMaterials: Input[][];
+    }>({
+        components: [],
+        supportingMaterials: [],
+    });
 
-    const handleInputsChange = useCallback((label: string, inputs: Input[][]) => {
-        startTransition(() => {
-            setAllInputs((prev) => ({
-                ...prev,
-                [label]: flattenInputs(inputs.flat(1)),
-            }));
-        });
-    }, []);
+    const inputMapRef = useRef<InputMap>({});
 
-    const [subComponentInputs, setSubComponentInputs] = useState<Input[]>([
+    const subComponentRenders = [
         {
             label: 'Sub Component',
             renderType: 'autocomplete',
@@ -50,8 +51,9 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
             type: 'static',
             className: 'flex-1',
         } as Input,
-    ]);
-    const [componentInputs, setComponentInputs] = useState<Input[]>([
+    ];
+
+    const componentRenders = [
         {
             label: 'Component',
             renderType: 'autocomplete',
@@ -90,15 +92,15 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
             className: 'w-full',
             rowClassName: 'flex gap-3 space-y-3',
             hideInitial: true,
-            renderInputs: subComponentInputs,
+            renderInputs: subComponentRenders,
             addButtonLabel: 'Add Sub Component',
         } as RepeaterInput,
-    ]);
+    ];
 
-    const [supportingMaterialInputs, setSupportingMaterialInputs] = useState<Input[]>([
+    const supportingMaterialRenders = [
         {
             label: 'Supporting Material',
-            renderType: 'autocomplete',
+            renderType: 'textfield',
             type: 'static',
             className: 'w-1/3',
             options: [],
@@ -109,43 +111,32 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
             type: 'static',
             className: 'w-1/4',
         } as Input,
-    ]);
+    ];
 
-    const supportingMaterialRenderInputs = supportingMaterialInputs.map((input) => {
-        if (input.label === 'Supporting Material' && input.renderType === 'autocomplete') {
-            return {
-                ...input,
-                options: Object.values(allInputs).flat(1).map((i) => i.id),
-            } as AutocompleteInput;
-        }
-        return input;
-    });
+    const flattenInputs = useCallback((inputs: Input[][]) => {
+        const map: InputMap = {};
+        const recursive = (rows: Input[][]) => {
+            if (!Array.isArray(rows)) return;
 
-    function flattenInputs(inputs: Input[]): Input[] {
-        const result: Input[] = [];
+            rows.forEach((row) => {
+                if (!Array.isArray(row)) return;
 
-        inputs.forEach((input) => {
-            if (input.renderType === 'repeater') {
-                const repeater = input as RepeaterInput;
+                row.forEach((input) => {
+                    if (!input || typeof input !== 'object') return;
 
-                if (Array.isArray(repeater.value)) {
-                    repeater.value.forEach((nestedRow: Input[] | Input, rowIndex) => {
-                        if (Array.isArray(nestedRow)) {
-                            // nested row of inputs
-                            result.push(...flattenInputs(nestedRow));
-                        } else {
-                            // single input (edge case)
-                            result.push(nestedRow);
-                        }
-                    });
-                }
-            } else {
-                result.push(input);
-            }
-        });
+                    const typedInput = input as Input;
+                    map[typedInput.id as string] = typedInput;
 
-        return result;
-    }
+                    if (typedInput.renderType == 'repeater') {
+                        const nestedRows = typedInput.value as Input[][];
+                        recursive(nestedRows);
+                    }
+                });
+            });
+        };
+        recursive(inputs);
+        inputMapRef.current = map; // ✅ persist across renders
+    }, []);
 
     return (
         <div className={cn('space-y-3 p-8')}>
@@ -157,8 +148,16 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
                     label="Components"
                     rowClassName={cn('flex flex-wrap gap-3 space-y-3')}
                     addButtonLabel="Add Component"
-                    renderInputs={componentInputs}
-                    onInputsChange={handleInputsChange}
+                    renderInputs={componentRenders}
+                    onInputsChange={(inputs) => {
+                        flattenInputs(inputs);
+                        console.log(inputMapRef.current);
+                        setFormState((prev) => ({
+                            ...prev,
+                            components: inputs,
+                        }));
+                    }}
+                    value={formState.components}
                 />
             </Paper>
             <Paper elevation={3} className={cn('p-8')}>
@@ -169,8 +168,15 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
                     label="Supporting Materials"
                     rowClassName={cn('flex gap-3 space-y-3')}
                     addButtonLabel="Add Supporting Material"
-                    renderInputs={supportingMaterialRenderInputs}
-                    onInputsChange={handleInputsChange}
+                    renderInputs={supportingMaterialRenders}
+                    onInputsChange={(inputs) => {
+                        flattenInputs(inputs);
+                        setFormState((prev) => ({
+                            ...prev,
+                            supportingMaterials: inputs,
+                        }));
+                    }}
+                    value={formState.supportingMaterials}
                 />
             </Paper>
         </div>
