@@ -8,7 +8,6 @@ const renderInput = (
     onChange: (value: string | Input[][]) => void,
     key: string,
     inputRefs?: React.RefObject<Record<string, HTMLInputElement | null>>,
-    disableMap?: Record<string, boolean>,
 ) => {
     switch (input.renderType) {
         case 'autocomplete': {
@@ -33,10 +32,17 @@ const renderInput = (
                 <TextField
                     key={key}
                     inputRef={(el) => {
-                        if (inputRefs && formulaTextFieldInput.id) inputRefs.current[formulaTextFieldInput.id] = el;
+                        if (inputRefs && input.id) inputRefs.current[formulaTextFieldInput.id as string] = el;
                     }}
-                    onFocus={() => formulaTextFieldInput.onFocus(formulaTextFieldInput.id as string)}
-                    disabled={disableMap ? disableMap[formulaTextFieldInput.id!] : false}
+                    onFocus={(e) => formulaTextFieldInput.onFocus?.(e.target as HTMLInputElement, formulaTextFieldInput.id as string)}
+                    onBlur={formulaTextFieldInput.onBlur}
+                    onMouseDown={(e) => {
+                        // get the actual input element
+                        const inputEl = e.currentTarget.querySelector('input');
+                        if (inputEl) {
+                            formulaTextFieldInput.onMouseDown?.(e, inputEl as HTMLInputElement, formulaTextFieldInput.id as string);
+                        }
+                    }}
                     className={cn('w-full', formulaTextFieldInput.className)}
                     label={formulaTextFieldInput.label}
                     value={formulaTextFieldInput.value}
@@ -61,6 +67,7 @@ const renderInput = (
             const repeaterInput = input as RepeaterInput;
             return (
                 <Repeater
+                    inputRefs={inputRefs}
                     key={key}
                     label={repeaterInput.label}
                     parentPrefix={repeaterInput.id}

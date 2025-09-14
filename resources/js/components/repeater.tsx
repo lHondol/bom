@@ -13,18 +13,31 @@ interface RowProps {
     rowClassName?: string;
     onChange: (rowIndex: number, inputIndex: number, value: string | Input[][]) => void;
     inputRefs?: React.RefObject<Record<string, HTMLInputElement | null>>;
-    disableMap?: Record<string, boolean>;
 }
 
-const Row = memo(({ row, rowIndex, rowClassName, onChange, inputRefs, disableMap }: RowProps) => {
-    return (
-        <div className={rowClassName} key={`row-${rowIndex}`}>
-            {row.map((input, inputIndex) =>
-                renderInput(input, (val) => onChange(rowIndex, inputIndex, val), input.id as string, inputRefs, disableMap),
-            )}
+const InputRenderer = memo(
+    ({
+        input,
+        onChange,
+        inputRefs,
+    }: {
+        input: Input;
+        onChange: (value: string | Input[][]) => void;
+        inputRefs?: React.RefObject<Record<string, HTMLInputElement | null>>;
+    }) => renderInput(input, onChange, input.id as string, inputRefs),
+    (prev, next) => prev.input.value === next.input.value,
+);
+
+const Row = memo(
+    ({ row, rowIndex, rowClassName, onChange, inputRefs }: RowProps) => (
+        <div className={rowClassName}>
+            {row.map((input, inputIndex) => (
+                <InputRenderer key={input.id} input={input} onChange={(val) => onChange(rowIndex, inputIndex, val)} inputRefs={inputRefs} />
+            ))}
         </div>
-    );
-});
+    ),
+    (prev, next) => prev.row === next.row,
+);
 Row.displayName = 'Row';
 
 function Repeater({
@@ -38,9 +51,7 @@ function Repeater({
     addButtonLabel,
     value,
     inputRefs,
-    disableMap,
 }: PropsWithChildren<RepeaterProps>) {
-    // Local state for instant updates
     const [localRows, setLocalRows] = useState<Input[][]>((value as Input[][]) ?? []);
 
     const initializeInput = useCallback(
@@ -66,37 +77,42 @@ function Repeater({
         [renderInputs, label],
     );
 
-    // Sync localRows with parent on first mount
+    // Initialize first row if hideInitial is false
     useEffect(() => {
-        if (!hideInitial && (!localRows || localRows.length === 0)) {
+        if (!hideInitial && localRows.length === 0) {
             const initialRow = renderInputs.map((input) => initializeInput(input, 0, parentPrefix));
             setLocalRows([initialRow]);
             onChange?.([initialRow]);
         }
     }, []);
 
-    // Debounced parent sync
+    useEffect(() => {
+        setLocalRows((prev) => {
+            // simple check to avoid unnecessary updates
+            if (JSON.stringify(prev) !== JSON.stringify(value)) {
+                return value as Input[][];
+            }
+            return prev;
+        });
+    }, [value]);
+
     const debouncedSync = useDebouncedCallback((rows: Input[][]) => {
         onChange?.(rows);
     }, 300);
 
-    // Input change handler
     const handleInputChange = useCallback(
         (rowIndex: number, inputIndex: number, newVal: string | Input[][]) => {
             setLocalRows((prev) => {
-                const updated = prev.map((row, i) =>
-                    i === rowIndex
-                        ? row.map((input, j) =>
-                              j === inputIndex
-                                  ? {
-                                        ...input,
-                                        value: newVal,
-                                        id: input.id,
-                                    }
-                                  : input,
-                          )
-                        : row,
-                );
+                const updated = [...prev];
+                const row = updated[rowIndex];
+                const input = row[inputIndex];
+
+                if (input.value === newVal) return prev;
+
+                const newRow = [...row];
+                newRow[inputIndex] = { ...input, value: newVal };
+                updated[rowIndex] = newRow;
+
                 debouncedSync(updated);
                 return updated;
             });
@@ -104,12 +120,11 @@ function Repeater({
         [debouncedSync],
     );
 
-    // Add new row
     const handleAddRow = useCallback(() => {
         const newRow = renderInputs.map((input) => initializeInput(input, localRows.length, parentPrefix));
         setLocalRows((prev) => {
             const updated = [...prev, newRow];
-            onChange?.(updated); // Instant sync on add
+            onChange?.(updated);
             return updated;
         });
     }, [localRows, renderInputs, initializeInput, parentPrefix, onChange]);
@@ -124,7 +139,6 @@ function Repeater({
                     rowClassName={rowClassName}
                     onChange={handleInputChange}
                     inputRefs={inputRefs}
-                    disableMap={disableMap}
                 />
             ))}
             <Button variant="contained" onClick={handleAddRow}>

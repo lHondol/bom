@@ -18,8 +18,9 @@ interface AutocompleteInput extends BaseInput {
 interface FormulaTextFieldInput extends BaseInput {
     type?: InputType;
     computedValue?: string;
-    onFocus: (id: string) => void;
-    disabled?: boolean
+    onFocus?: (el: HTMLInputElement, inputId: string) => void;
+    onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
+    onMouseDown?: (e: React.MouseEvent<HTMLElement>, el: HTMLInputElement, inputId: string) => void;
 }
 
 interface RepeaterInput extends BaseInput {
@@ -30,7 +31,6 @@ interface RepeaterInput extends BaseInput {
     addButtonLabel: string;
     parentPrefix?: string;
     inputRefs?: React.RefObject<Record<string, HTMLInputElement | null>>;
-    disableMap?: Record<string, boolean>
 }
 
 type Input = AutocompleteInput | FormulaTextFieldInput | RepeaterInput;
