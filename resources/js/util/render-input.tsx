@@ -1,9 +1,15 @@
 import { Repeater } from '@/components/repeater';
 import { cn } from '@/lib/utils';
-import { AutocompleteInput, Input, RepeaterInput } from '@/types/input';
+import { AutocompleteInput, FormulaTextFieldInput, Input, RepeaterInput } from '@/types/input';
 import { Autocomplete, TextField } from '@mui/material';
 
-const renderInput = (input: Input, onChange: (value: string | Input[][]) => void, key: string) => {
+const renderInput = (
+    input: Input,
+    onChange: (value: string | Input[][]) => void,
+    key: string,
+    inputRefs?: React.RefObject<Record<string, HTMLInputElement | null>>,
+    disableMap?: Record<string, boolean>,
+) => {
     switch (input.renderType) {
         case 'autocomplete': {
             const autoCompleteInput = input as AutocompleteInput;
@@ -21,17 +27,24 @@ const renderInput = (input: Input, onChange: (value: string | Input[][]) => void
             );
             break;
         }
-        case 'textfield':
+        case 'formulatextfield': {
+            const formulaTextFieldInput = input as FormulaTextFieldInput;
             return (
                 <TextField
                     key={key}
-                    className={cn('w-full', input.className)}
-                    label={input.label}
-                    value={input.value}
+                    inputRef={(el) => {
+                        if (inputRefs && formulaTextFieldInput.id) inputRefs.current[formulaTextFieldInput.id] = el;
+                    }}
+                    onFocus={() => formulaTextFieldInput.onFocus(formulaTextFieldInput.id as string)}
+                    disabled={disableMap ? disableMap[formulaTextFieldInput.id!] : false}
+                    className={cn('w-full', formulaTextFieldInput.className)}
+                    label={formulaTextFieldInput.label}
+                    value={formulaTextFieldInput.value}
                     onChange={(e) => onChange(e.target.value)}
                 />
             );
             break;
+        }
         case 'textfieldnumeric':
             return (
                 <TextField
@@ -55,7 +68,7 @@ const renderInput = (input: Input, onChange: (value: string | Input[][]) => void
                     rowClassName={cn('w-full', repeaterInput.rowClassName)}
                     className={cn('w-full', input.className)}
                     renderInputs={repeaterInput.renderInputs}
-                    onInputsChange={(inputs) => {
+                    onChange={(inputs) => {
                         onChange(inputs);
                     }}
                     addButtonLabel={repeaterInput.addButtonLabel}

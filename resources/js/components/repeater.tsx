@@ -2,33 +2,25 @@ import { cn } from '@/lib/utils';
 import { Input, RepeaterInput } from '@/types/input';
 import { renderInput } from '@/util/render-input';
 import { Button } from '@mui/material';
-import { memo, PropsWithChildren, useCallback, useEffect, useState } from 'react';
+import React, { memo, PropsWithChildren, useCallback, useEffect, useState } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 
-interface RepeaterProps {
-    label?: string;
-    parentPrefix?: string;
-    hideInitial?: boolean;
-    renderInputs: Input[];
-    onInputsChange?: (inputs: Input[][]) => void;
-    className?: string;
-    rowClassName?: string;
-    addButtonLabel?: string;
-    value: Input[][];
-}
+type RepeaterProps = RepeaterInput;
 
 interface RowProps {
     row: Input[];
     rowIndex: number;
     rowClassName?: string;
     onChange: (rowIndex: number, inputIndex: number, value: string | Input[][]) => void;
+    inputRefs?: React.RefObject<Record<string, HTMLInputElement | null>>;
+    disableMap?: Record<string, boolean>;
 }
 
-const Row = memo(({ row, rowIndex, rowClassName, onChange }: RowProps) => {
+const Row = memo(({ row, rowIndex, rowClassName, onChange, inputRefs, disableMap }: RowProps) => {
     return (
         <div className={rowClassName} key={`row-${rowIndex}`}>
             {row.map((input, inputIndex) =>
-                renderInput(input, (val) => onChange(rowIndex, inputIndex, val), `${rowIndex}-${inputIndex}-${input.id}`),
+                renderInput(input, (val) => onChange(rowIndex, inputIndex, val), input.id as string, inputRefs, disableMap),
             )}
         </div>
     );
@@ -40,14 +32,16 @@ function Repeater({
     parentPrefix = '',
     hideInitial = false,
     renderInputs,
-    onInputsChange,
+    onChange,
     className,
     rowClassName,
     addButtonLabel,
     value,
+    inputRefs,
+    disableMap,
 }: PropsWithChildren<RepeaterProps>) {
     // Local state for instant updates
-    const [localRows, setLocalRows] = useState<Input[][]>(value ?? []);
+    const [localRows, setLocalRows] = useState<Input[][]>((value as Input[][]) ?? []);
 
     const initializeInput = useCallback(
         (input: Input, index: number, prefix?: string): Input => {
@@ -62,6 +56,7 @@ function Repeater({
                     value: !repeaterInput.hideInitial ? [repeaterInput.renderInputs.map((subInput) => initializeInput(subInput, 0, currentId))] : [],
                 };
             }
+
             return {
                 ...input,
                 id: currentId,
@@ -74,15 +69,15 @@ function Repeater({
     // Sync localRows with parent on first mount
     useEffect(() => {
         if (!hideInitial && (!localRows || localRows.length === 0)) {
-            const initialRow = renderInputs.map((input, i) => initializeInput(input, 0, parentPrefix));
+            const initialRow = renderInputs.map((input) => initializeInput(input, 0, parentPrefix));
             setLocalRows([initialRow]);
-            onInputsChange?.([initialRow]);
+            onChange?.([initialRow]);
         }
     }, []);
 
     // Debounced parent sync
     const debouncedSync = useDebouncedCallback((rows: Input[][]) => {
-        onInputsChange?.(rows);
+        onChange?.(rows);
     }, 300);
 
     // Input change handler
@@ -90,7 +85,17 @@ function Repeater({
         (rowIndex: number, inputIndex: number, newVal: string | Input[][]) => {
             setLocalRows((prev) => {
                 const updated = prev.map((row, i) =>
-                    i === rowIndex ? row.map((input, j) => (j === inputIndex ? { ...input, value: newVal } : input)) : row,
+                    i === rowIndex
+                        ? row.map((input, j) =>
+                              j === inputIndex
+                                  ? {
+                                        ...input,
+                                        value: newVal,
+                                        id: input.id,
+                                    }
+                                  : input,
+                          )
+                        : row,
                 );
                 debouncedSync(updated);
                 return updated;
@@ -104,15 +109,23 @@ function Repeater({
         const newRow = renderInputs.map((input) => initializeInput(input, localRows.length, parentPrefix));
         setLocalRows((prev) => {
             const updated = [...prev, newRow];
-            onInputsChange?.(updated); // Instant sync on add
+            onChange?.(updated); // Instant sync on add
             return updated;
         });
-    }, [localRows, renderInputs, initializeInput, parentPrefix, onInputsChange]);
+    }, [localRows, renderInputs, initializeInput, parentPrefix, onChange]);
 
     return (
         <div className={cn('space-y-3', className)}>
             {localRows.map((row, rowIndex) => (
-                <Row key={`row-${rowIndex}`} row={row} rowIndex={rowIndex} rowClassName={rowClassName} onChange={handleInputChange} />
+                <Row
+                    key={`row-${rowIndex}`}
+                    row={row}
+                    rowIndex={rowIndex}
+                    rowClassName={rowClassName}
+                    onChange={handleInputChange}
+                    inputRefs={inputRefs}
+                    disableMap={disableMap}
+                />
             ))}
             <Button variant="contained" onClick={handleAddRow}>
                 {addButtonLabel ?? 'Add Row'}

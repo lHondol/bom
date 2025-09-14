@@ -2,13 +2,13 @@ import { Repeater } from '@/components/repeater';
 import { cn } from '@/lib/utils';
 import { AutocompleteInput, Input, RepeaterInput } from '@/types/input';
 import { Paper, Typography } from '@mui/material';
-import { PropsWithChildren, useCallback, useRef, useState } from 'react';
-
-interface BomRecordProps {}
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type InputMap = Record<string, Input>;
 
-export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps>) {
+export default function BomRecord() {
+    const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
     const [formState, setFormState] = useState<{
         components: Input[][];
         supportingMaterials: Input[][];
@@ -17,7 +17,23 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
         supportingMaterials: [],
     });
 
+    const [disabledMap, setDisabledMap] = useState<Record<string, boolean>>({});
+
     const inputMapRef = useRef<InputMap>({});
+
+    const handleOnFocus = (id: string) => {
+        setDisabledMap(() => {
+            const map: Record<string, boolean> = {};
+            Object.keys(inputRefs.current).forEach((key) => {
+                map[key] = id !== key;
+            });
+            return map;
+        });
+    };
+
+    const disabled = (id: string): boolean => {
+        return disabledMap[id];
+    }
 
     const subComponentRenders = [
         {
@@ -29,25 +45,25 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
         } as AutocompleteInput,
         {
             label: 'Quantity',
-            renderType: 'textfield',
+            renderType: 'formulatextfield',
             type: 'static',
             className: 'flex-1',
         } as Input,
         {
             label: 'Depth',
-            renderType: 'textfield',
+            renderType: 'formulatextfield',
             type: 'static',
             className: 'flex-1',
         } as Input,
         {
             label: 'Width',
-            renderType: 'textfield',
+            renderType: 'formulatextfield',
             type: 'static',
             className: 'flex-1',
         } as Input,
         {
             label: 'Length',
-            renderType: 'textfield',
+            renderType: 'formulatextfield',
             type: 'static',
             className: 'flex-1',
         } as Input,
@@ -63,27 +79,31 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
         } as AutocompleteInput,
         {
             label: 'Quantity',
-            renderType: 'textfield',
+            renderType: 'formulatextfield',
             type: 'static',
             className: 'flex-1',
+            onFocus: handleOnFocus,
         } as Input,
         {
             label: 'Depth',
-            renderType: 'textfield',
+            renderType: 'formulatextfield',
             type: 'static',
             className: 'flex-1',
+            onFocus: handleOnFocus,
         } as Input,
         {
             label: 'Width',
-            renderType: 'textfield',
+            renderType: 'formulatextfield',
             type: 'static',
             className: 'flex-1',
+            onFocus: handleOnFocus,
         } as Input,
         {
             label: 'Length',
-            renderType: 'textfield',
+            renderType: 'formulatextfield',
             type: 'static',
             className: 'flex-1',
+            onFocus: handleOnFocus,
         } as Input,
         {
             label: 'Sub Components',
@@ -100,14 +120,14 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
     const supportingMaterialRenders = [
         {
             label: 'Supporting Material',
-            renderType: 'textfield',
+            renderType: 'formulatextfield',
             type: 'static',
             className: 'w-1/3',
             options: [],
         } as AutocompleteInput,
         {
             label: 'Price',
-            renderType: 'textfield',
+            renderType: 'formulatextfield',
             type: 'static',
             className: 'w-1/4',
         } as Input,
@@ -135,7 +155,7 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
             });
         };
         recursive(inputs);
-        inputMapRef.current = map; // ✅ persist across renders
+        inputMapRef.current = map; // persist across renders
     }, []);
 
     return (
@@ -145,13 +165,14 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
                     Components
                 </Typography>
                 <Repeater
+                    inputRefs={inputRefs}
+                    disableMap={disabledMap}
                     label="Components"
                     rowClassName={cn('flex flex-wrap gap-3 space-y-3')}
                     addButtonLabel="Add Component"
                     renderInputs={componentRenders}
-                    onInputsChange={(inputs) => {
+                    onChange={(inputs) => {
                         flattenInputs(inputs);
-                        console.log(inputMapRef.current);
                         setFormState((prev) => ({
                             ...prev,
                             components: inputs,
@@ -165,11 +186,12 @@ export default function BomRecord({ ...props }: PropsWithChildren<BomRecordProps
                     Supporting Materials
                 </Typography>
                 <Repeater
+                    inputRefs={inputRefs}
                     label="Supporting Materials"
                     rowClassName={cn('flex gap-3 space-y-3')}
                     addButtonLabel="Add Supporting Material"
                     renderInputs={supportingMaterialRenders}
-                    onInputsChange={(inputs) => {
+                    onChange={(inputs) => {
                         flattenInputs(inputs);
                         setFormState((prev) => ({
                             ...prev,
