@@ -35,7 +35,7 @@ const renderInput = (
                         if (inputRefs && input.id) inputRefs.current[formulaTextFieldInput.id as string] = el;
                     }}
                     onFocus={(e) => formulaTextFieldInput.onFocus?.(e.target as HTMLInputElement, formulaTextFieldInput.id as string)}
-                    onBlur={formulaTextFieldInput.onBlur}
+                    onBlur={(e) => formulaTextFieldInput.onBlur?.(e.target as HTMLInputElement, formulaTextFieldInput.id as string)}
                     onMouseDown={(e) => {
                         // get the actual input element
                         const inputEl = e.currentTarget.querySelector('input');
@@ -45,7 +45,7 @@ const renderInput = (
                     }}
                     className={cn('w-full', formulaTextFieldInput.className)}
                     label={formulaTextFieldInput.label}
-                    value={formulaTextFieldInput.value}
+                    value={formulaTextFieldInput.value ?? ''}
                     onChange={(e) => onChange(e.target.value)}
                 />
             );

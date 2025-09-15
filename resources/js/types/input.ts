@@ -17,9 +17,9 @@ interface AutocompleteInput extends BaseInput {
 
 interface FormulaTextFieldInput extends BaseInput {
     type?: InputType;
-    computedValue?: string;
+    formula?: string;
     onFocus?: (el: HTMLInputElement, inputId: string) => void;
-    onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
+    onBlur?: (el: HTMLInputElement, inputId: string) => void;
     onMouseDown?: (e: React.MouseEvent<HTMLElement>, el: HTMLInputElement, inputId: string) => void;
 }
 

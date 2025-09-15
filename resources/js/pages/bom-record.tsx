@@ -1,8 +1,8 @@
 import { Repeater } from '@/components/repeater';
 import { cn } from '@/lib/utils';
-import { AutocompleteInput, Input, RepeaterInput } from '@/types/input';
+import { AutocompleteInput, FormulaTextFieldInput, Input, RepeaterInput } from '@/types/input';
 import { Paper, Typography } from '@mui/material';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 
 export default function BomRecord() {
     const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -16,10 +16,6 @@ export default function BomRecord() {
         components: [],
         supportingMaterials: [],
     });
-
-    useEffect(() => {
-        console.log(formState)
-    }, [formState]);
 
     const inputMapRef = useRef<Record<string, Input>>({});
 
@@ -39,50 +35,99 @@ export default function BomRecord() {
         recursive(inputs);
     }, []);
 
+    const computeValue = useCallback((formula?: string): string => {
+        if (!formula) return '';
+
+        try {
+            const clean = formula.replace(/^=/, '');
+
+            // Match variables, numbers, operators, and parentheses
+            const tokens = clean.match(/[A-Za-z_]\w*|\d+|[+\-*/()]/g) || [];
+
+            const newTokens = tokens.map((token) => {
+                if (!/^[+\-*/()]$/.test(token)) {
+                    if (!isNaN(parseFloat(token))) return token;
+                    return inputMapRef.current[token]?.value;
+                }
+                return token;
+            });
+
+            return eval(newTokens.join(''));
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (err) {
+            return 'NaN';
+        }
+    }, []);
+
+    const updateInputs = (inputId: string, focusedValue?: string, asFormula: boolean = false) => {
+        const updateRows = (rows: Input[][]): Input[][] =>
+            rows.map((row) =>
+                row.map((i) => {
+                    if (i.id === inputId && i.renderType == 'formulatextfield')
+                        return {
+                            ...i,
+                            value: !asFormula ? computeValue(focusedValue) : focusedValue,
+                            formula: focusedValue?.includes('=') ? focusedValue : '',
+                        };
+                    if (i.renderType === 'repeater') {
+                        return { ...i, value: updateRows(i.value as Input[][]) };
+                    }
+                    return i;
+                }),
+            );
+
+        setFormState((prev) => {
+            const newState = {
+                components: updateRows(prev.components),
+                supportingMaterials: updateRows(prev.supportingMaterials),
+            };
+            flattenInputs(newState.components);
+            flattenInputs(newState.supportingMaterials);
+            return newState;
+        });
+    };
+
     // Focus / blur handlers
     const handleFocus = useCallback((el: HTMLInputElement, inputId: string) => {
         focusedRef.current = el;
         focusedFieldIdRef.current = inputId;
+
+        updateInputs(inputId, (inputMapRef.current[inputId] as FormulaTextFieldInput).formula, true);
     }, []);
 
-    const handleBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    const handleBlur = useCallback((el: HTMLInputElement, inputId: string) => {
+        const focusedValue = focusedRef.current?.value;
+
+        updateInputs(inputId, focusedValue);
+
         focusedRef.current = null;
         focusedFieldIdRef.current = '';
     }, []);
 
-    const handleInputMouseDown = useCallback((e: React.MouseEvent<HTMLInputElement>, el: HTMLInputElement, inputId: string) => {
-        if (focusedRef.current && focusedRef.current !== el) {
-            e.preventDefault(); // prevent focus from changing
-            focusedRef.current.focus(); // keep current input focused
+    const handleInputMouseDown = useCallback(
+        (e: React.MouseEvent<HTMLInputElement>, el: HTMLInputElement, inputId: string) => {
+            if (focusedRef.current && focusedRef.current !== el) {
+                e.preventDefault(); // prevent focus from changing
+                focusedRef.current.focus(); // keep current input focused
 
-            const clickedValue = inputMapRef.current[inputId]?.id;
-            const focusedId = focusedFieldIdRef.current;
-            const focusedValue = inputMapRef.current[focusedId]?.value as string;
-            if (!clickedValue || !focusedId) return;
+                const clickedId = inputMapRef.current[inputId]?.id;
+                const focusedValue = focusedRef.current.value;
+                const focusedId = focusedFieldIdRef.current;
+                if (!clickedId || !focusedId) return;
 
-            if (focusedValue?.startsWith("=")) {
-                const updateRows = (rows: Input[][]): Input[][] =>
-                    rows.map((row) =>
-                        row.map((i) => {
-                            if (i.id === focusedId) return { ...i, value: clickedValue };
-                            if (i.renderType === 'repeater') {
-                                return { ...i, value: updateRows(i.value as Input[][]) };
-                            }
-                            return i;
-                        }),
-                    );
+                if (focusedValue?.startsWith('=') && focusedValue?.includes('=')) {
+                    const caretIndex = focusedRef.current.selectionStart;
+                    // Inputted outside clickedField will be not replaced
+                    const newFocusedValue = focusedValue.slice(0, caretIndex as number) + clickedId + focusedValue.slice(caretIndex as number);
+                    focusedRef.current.value = newFocusedValue;
 
-                setFormState((prev) => {
-                    const newState = {
-                        components: updateRows(prev.components),
-                        supportingMaterials: updateRows(prev.supportingMaterials),
-                    };
-                    console.log('Updated state:', newState); // <-- now this shows the correct updated value
-                    return newState;
-                });
+                    focusedRef.current.selectionStart = (caretIndex as number) + clickedId.length;
+                    focusedRef.current.selectionEnd = (caretIndex as number) + clickedId.length;
+                }
             }
-        }
-    }, [formState]);
+        },
+        [formState],
+    );
 
     const subComponentRenders: Input[] = [
         {
